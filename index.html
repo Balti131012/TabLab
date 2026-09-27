@@ -105,6 +105,55 @@
   .fret-key:hover { border-color: var(--brass); }
   .fret-key.open { background: var(--wood); color: #E7DCC2; }
 
+  .chord-key {
+    flex: 0 0 auto; min-width: 42px; height: 34px; padding: 0 10px; border-radius: 3px;
+    border: 1px solid var(--brass); background: transparent; color: var(--brass); font-weight: 700; font-size: 0.8rem;
+  }
+  .chord-key:hover { background: rgba(169,124,51,0.15); border-color: var(--brass-bright); }
+
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 50;
+    align-items: flex-start; justify-content: center; padding: 16px;
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+    overflow-y: auto;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-card {
+    background: var(--paper); border: 1px solid var(--paper-edge); border-radius: 4px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5); padding: 18px; max-width: 640px; width: 100%;
+  }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .modal-head h2 {
+    font-family: 'Abril Fatface', Georgia, serif; font-weight: 400; text-transform: uppercase;
+    color: var(--ink); font-size: 1.3rem; margin: 0; letter-spacing: 0.02em;
+  }
+  .chord-scroll { overflow-x: auto; }
+  .chord-table { border-collapse: collapse; width: 100%; }
+  .chord-table th, .chord-table td { padding: 2px; text-align: center; }
+  .chord-table th {
+    font-size: 0.68rem; color: var(--brass); letter-spacing: 0.04em; font-weight: 700;
+    border-bottom: 2px solid var(--ink);
+  }
+  .chord-table td.row-head {
+    font-weight: 700; color: var(--ink); font-size: 0.82rem; text-align: right; padding-right: 8px;
+    border-right: 2px solid var(--ink);
+  }
+  .chord-cell {
+    width: 100%; min-width: 46px; height: 30px; border-radius: 3px; border: 1px solid var(--paper-edge);
+    background: #DED0AC; color: var(--ink); font-weight: 600; font-size: 0.7rem;
+  }
+  .chord-cell:hover { border-color: var(--brass); background: rgba(169,124,51,0.25); }
+
+  .voicing-list { display: flex; flex-direction: column; gap: 8px; }
+  .voicing-btn {
+    display: flex; justify-content: space-between; align-items: center; width: 100%;
+    padding: 10px 12px; border-radius: 3px; border: 1px solid var(--brass);
+    background: transparent; color: var(--ink); font-family: 'JetBrains Mono', monospace; text-align: left;
+  }
+  .voicing-btn:hover { background: rgba(169,124,51,0.15); border-color: var(--brass-bright); }
+  .voicing-btn .v-label { font-weight: 700; color: var(--brass); font-size: 0.82rem; }
+  .voicing-btn .v-frets { font-size: 0.8rem; color: var(--ink-soft); letter-spacing: 0.05em; }
+
   .keys-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .tech-key {
     min-width: 38px; height: 32px; border-radius: 3px; border: 1px solid var(--paper-edge);
@@ -185,6 +234,10 @@
   <div class="keypad">
     <p class="card-label">FRETBOARD KEYS — tap a cell above, then a fret</p>
     <div class="frets-row" id="fretsRow"></div>
+    <p class="card-label" style="margin-top:12px;">CHORDS — fills all six strings of the selected beat at once</p>
+    <button id="openChordPicker" class="primary" style="width:100%;">Pick a chord…</button>
+    <p class="card-label" style="margin-top:12px;">ARPEGGIOS — spreads the chord tones across the following beats</p>
+    <button id="openArpeggioPicker" class="primary" style="width:100%;">Pick an arpeggio…</button>
     <div class="keys-row" id="techRow">
       <button class="tech-key wide" data-tech="h">h · hammer</button>
       <button class="tech-key wide" data-tech="p">p · pull-off</button>
@@ -229,6 +282,44 @@
   </div>
 </main>
 
+<div class="modal-backdrop" id="chordModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Chord Picker</h2>
+      <button id="closeChordPicker" class="tech-key back-key">✕</button>
+    </div>
+    <p class="hint" style="margin:0 0 10px;">Rows are the root note, columns are the variation. Tap a cell to fill the selected beat. Shapes are standard open/barre positions for EADGBE tuning.</p>
+    <div class="chord-scroll">
+      <table class="chord-table" id="chordTable"></table>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="arpeggioModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Arpeggio Picker</h2>
+      <button id="closeArpeggioPicker" class="tech-key back-key">✕</button>
+    </div>
+    <p class="hint" style="margin:0 0 10px;">Rows are the root note, columns are the variation. Tap a cell to lay its notes across the beats ahead, one string at a time.</p>
+    <div class="chord-scroll">
+      <table class="chord-table" id="arpeggioTable"></table>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="voicingModal">
+  <div class="modal-card" style="max-width:400px;">
+    <div class="modal-head">
+      <h2 id="voicingTitle">Chord</h2>
+      <button id="closeVoicingPicker" class="tech-key back-key">✕</button>
+    </div>
+    <p class="hint" style="margin:0 0 10px;">Pick how it's played — open position, or barre at a lower or higher octave.</p>
+    <div id="voicingList" class="voicing-list"></div>
+    <button id="backToChords" style="margin-top:10px; width:100%;">← Back to grid</button>
+  </div>
+</div>
+
 <footer>Saved automatically in this browser.</footer>
 
 <script>
@@ -238,6 +329,46 @@
   var DUR_LABEL = { w: 'w', h: 'h', q: 'q', e: 'e', s: '16' };
   var UNIT_PX = 13;
   var MAX_FRET = 24;
+  var NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  var QUALITIES = [
+    { key: '',     label: 'Maj' },
+    { key: 'm',    label: 'min' },
+    { key: '7',    label: '7' },
+    { key: 'm7',   label: 'm7' },
+    { key: 'maj7', label: 'maj7' },
+    { key: 'sus4', label: 'sus4' },
+    { key: '6',    label: '6' },
+    { key: 'sus2', label: 'sus2' }
+  ];
+  // Movable barre shapes, listed low E to high e, as offsets ADDED to the barre fret.
+  // 'x' = that string is never played for this shape. E-shape has no clean sus2; A-shape covers it.
+  var SHAPES = {
+    E: { '': [0,2,2,1,0,0], 'm': [0,2,2,0,0,0], '7': [0,2,0,1,0,0], 'm7': [0,2,0,0,0,0],
+         'maj7': [0,2,1,1,0,0], 'sus4': [0,2,2,2,0,0], '6': [0,2,2,1,2,0] },
+    A: { '': ['x',0,2,2,2,0], 'm': ['x',0,2,2,1,0], '7': ['x',0,2,0,2,0], 'm7': ['x',0,2,0,1,0],
+         'maj7': ['x',0,2,1,2,0], 'sus4': ['x',0,2,2,3,0], '6': ['x',0,2,2,2,2], 'sus2': ['x',0,2,2,0,0] }
+  };
+  var SHAPE_ROOT = { E: NOTES.indexOf('E'), A: NOTES.indexOf('A') };
+  // Known open-position fingerings (low E to high e), for chords that have a natural open shape.
+  var OPEN_SHAPES = {
+    'C': [-1,3,2,0,1,0], 'Cmaj7': [-1,3,2,0,0,0], 'C7': [-1,3,2,3,1,0], 'C6': [-1,3,2,2,1,0],
+    'G': [3,2,0,0,3,3], 'G7': [3,2,0,0,0,1],
+    'D': [-1,-1,0,2,3,2], 'Dm': [-1,-1,0,2,3,1], 'D7': [-1,-1,0,2,1,2], 'Dsus4': [-1,-1,0,2,3,3], 'D6': [-1,-1,0,2,0,2],
+    'A': [-1,0,2,2,2,0], 'Am': [-1,0,2,2,1,0], 'A7': [-1,0,2,0,2,0], 'Asus2': [-1,0,2,2,0,0], 'Asus4': [-1,0,2,2,3,0],
+    'E': [0,2,2,1,0,0], 'Em': [0,2,2,0,0,0], 'E7': [0,2,0,1,0,0], 'Em7': [0,2,0,0,0,0],
+    'Emaj7': [0,2,1,1,0,0], 'Esus4': [0,2,2,2,0,0], 'E6': [0,2,2,1,2,0],
+    'B7': [-1,2,1,2,0,2]
+  };
+
+  function barreFor(family, noteIdx) { return (noteIdx - SHAPE_ROOT[family] + 12) % 12; }
+  function shapeFrets(family, qualityKey, noteIdx) {
+    var offsets = SHAPES[family][qualityKey];
+    if (!offsets) return null;
+    var barre = barreFor(family, noteIdx);
+    return offsets.map(function(o) { return o === 'x' ? -1 : barre + o; });
+  }
+  function fretsToText(frets) { return frets.map(function(f) { return f < 0 ? 'x' : f; }).join('-'); }
+  function maxFret(frets) { return Math.max.apply(null, frets); }
   var STORE_KEY = 'fret-sheet-v4';
   var state = { title: 'Untitled Tab', tuning: 'e,B,G,D,A,E', bpm: 120, measures: [] };
   var selected = null; // {m, h, s}
@@ -304,6 +435,37 @@
       fretsRow.appendChild(b);
     }
   }
+
+  function buildGridTable(tableId, mode) {
+    var table = document.getElementById(tableId);
+    table.innerHTML = '';
+    var head = document.createElement('tr');
+    head.appendChild(document.createElement('th'));
+    QUALITIES.forEach(function(q) { var th = document.createElement('th'); th.textContent = q.label; head.appendChild(th); });
+    table.appendChild(head);
+    NOTES.forEach(function(note, noteIdx) {
+      var tr = document.createElement('tr');
+      var rh = document.createElement('td');
+      rh.className = 'row-head';
+      rh.textContent = note;
+      tr.appendChild(rh);
+      QUALITIES.forEach(function(q) {
+        var td = document.createElement('td');
+        var btn = document.createElement('button');
+        btn.className = 'chord-cell';
+        btn.textContent = note + q.key;
+        btn.addEventListener('click', function() { openVoicingPicker(noteIdx, q, mode); });
+        td.appendChild(btn);
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    });
+  }
+
+  function openChordModal() { document.getElementById('chordModal').classList.add('open'); }
+  function closeChordModal() { document.getElementById('chordModal').classList.remove('open'); }
+  function openArpeggioModal() { document.getElementById('arpeggioModal').classList.add('open'); }
+  function closeArpeggioModal() { document.getElementById('arpeggioModal').classList.remove('open'); }
 
   function renderMeasures() {
     measuresEl.innerHTML = '';
@@ -447,6 +609,66 @@
     advance();
     renderMeasures(); updateExport(); save();
   }
+  function pressChord(shape) {
+    ensureSelection();
+    var grid = currentHead().grid; // index 0 = high e ... index 5 = low E
+    for (var i = 0; i < 6; i++) { var f = shape[5 - i]; grid[i] = f < 0 ? 'x' : String(f); }
+    advance();
+    renderMeasures(); updateExport(); save();
+    closeVoicingModal();
+  }
+
+  // Lays the shape's notes across the following beats, one string at a time,
+  // low string to high string — a simple ascending arpeggio run.
+  function pressArpeggio(shape) {
+    ensureSelection();
+    for (var i = 0; i < 6; i++) { // i=0 is the low E string in `shape`
+      if (shape[i] < 0) continue;
+      var grid = currentHead().grid;
+      for (var s = 0; s < 6; s++) grid[s] = '-';
+      grid[5 - i] = String(shape[i]);
+      advance();
+    }
+    renderMeasures(); updateExport(); save();
+    closeVoicingModal();
+  }
+
+  var pendingMode = 'chord';
+  function openVoicingPicker(noteIdx, quality, mode) {
+    pendingMode = mode;
+    var note = NOTES[noteIdx];
+    var chordName = note + quality.key;
+    var list = [];
+    var open = OPEN_SHAPES[chordName];
+    if (open) list.push({ label: 'Open', frets: open });
+    ['E', 'A'].forEach(function(family) {
+      var low = shapeFrets(family, quality.key, noteIdx);
+      if (!low) return;
+      var fret = barreFor(family, noteIdx);
+      var shapeName = family + '-shape';
+      list.push({ label: (fret === 0 ? 'Open position' : 'Barre, fret ' + fret) + ' (' + shapeName + ')', frets: low });
+      var high = low.map(function(f) { return f < 0 ? f : f + 12; });
+      if (maxFret(high) <= MAX_FRET) {
+        list.push({ label: 'Barre, fret ' + (fret + 12) + ' — octave up (' + shapeName + ')', frets: high });
+      }
+    });
+
+    document.getElementById('voicingTitle').textContent = (mode === 'arpeggio' ? 'Arpeggio: ' : 'Chord: ') + chordName;
+    var apply = mode === 'arpeggio' ? pressArpeggio : pressChord;
+    var box = document.getElementById('voicingList');
+    box.innerHTML = '';
+    list.forEach(function(v) {
+      var b = document.createElement('button');
+      b.className = 'voicing-btn';
+      b.innerHTML = '<span class="v-label">' + v.label + '</span><span class="v-frets">' + fretsToText(v.frets) + '</span>';
+      b.addEventListener('click', function() { apply(v.frets); });
+      box.appendChild(b);
+    });
+    closeChordModal();
+    closeArpeggioModal();
+    document.getElementById('voicingModal').classList.add('open');
+  }
+  function closeVoicingModal() { document.getElementById('voicingModal').classList.remove('open'); }
   function pressTechnique(ch) {
     ensureSelection();
     var head = currentHead();
@@ -524,6 +746,19 @@
   document.getElementById('bpmUp').addEventListener('click', function() { setBpm(state.bpm + 5); });
   document.getElementById('bpmDown').addEventListener('click', function() { setBpm(state.bpm - 5); });
 
+  document.getElementById('openChordPicker').addEventListener('click', openChordModal);
+  document.getElementById('closeChordPicker').addEventListener('click', closeChordModal);
+  document.getElementById('chordModal').addEventListener('click', function(e) { if (e.target.id === 'chordModal') closeChordModal(); });
+  document.getElementById('openArpeggioPicker').addEventListener('click', openArpeggioModal);
+  document.getElementById('closeArpeggioPicker').addEventListener('click', closeArpeggioModal);
+  document.getElementById('arpeggioModal').addEventListener('click', function(e) { if (e.target.id === 'arpeggioModal') closeArpeggioModal(); });
+  document.getElementById('closeVoicingPicker').addEventListener('click', closeVoicingModal);
+  document.getElementById('backToChords').addEventListener('click', function() {
+    closeVoicingModal();
+    if (pendingMode === 'arpeggio') openArpeggioModal(); else openChordModal();
+  });
+  document.getElementById('voicingModal').addEventListener('click', function(e) { if (e.target.id === 'voicingModal') closeVoicingModal(); });
+
   document.getElementById('restKey').addEventListener('click', pressRest);
   document.getElementById('backKey').addEventListener('click', pressBack);
   document.getElementById('prevCell').addEventListener('click', function() { moveSelection(-1); });
@@ -545,6 +780,8 @@
   }
 
   buildFretsRow();
+  buildGridTable('chordTable', 'chord');
+  buildGridTable('arpeggioTable', 'arpeggio');
   load();
   renderAll();
 })();
