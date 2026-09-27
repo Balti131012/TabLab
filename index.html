@@ -88,7 +88,15 @@
   }
   .dur-cell.selected { background: rgba(169,124,51,0.22); box-shadow: inset 0 0 0 1px var(--brass); }
 
-  .sig-row { display: flex; align-items: center; padding: 2px 0 4px; }
+  .sig-row { display: flex; align-items: center; gap: 4px; padding: 2px 4px 4px 0; }
+  .bar-btn {
+    font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.66rem;
+    min-height: 30px; padding: 0 6px; border: 1px solid var(--brass); border-radius: 2px;
+    background: transparent; color: var(--brass); cursor: pointer;
+  }
+  .bar-btn.copy { margin-left: auto; }
+  .bar-btn.active { background: rgba(169,124,51,0.22); border-color: var(--brass-bright); color: var(--brass-bright); }
+  .bar-btn:disabled { opacity: 0.35; cursor: default; }
   .sig-select {
     font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.72rem;
     border: none; border-bottom: 1px dashed var(--brass); background: transparent; color: var(--brass);
@@ -397,6 +405,24 @@
     measure.sig = sig;
     measure.heads = newHeads;
   }
+  // Bar clipboard lives in memory only — not part of `state`, so it isn't saved.
+  var barClipboard = null;
+  var clipboardSrc = -1;
+  function cloneMeasure(m) {
+    return { sig: { num: m.sig.num, den: m.sig.den }, heads: m.heads.map(function(h) { return { duration: h.duration, grid: h.grid.slice() }; }) };
+  }
+  function copyBar(mIdx) {
+    barClipboard = cloneMeasure(state.measures[mIdx]);
+    clipboardSrc = mIdx;
+    renderMeasures();
+  }
+  function pasteBar(mIdx) {
+    if (!barClipboard) return;
+    state.measures[mIdx] = cloneMeasure(barClipboard);
+    if (selected && selected.m === mIdx && selected.h >= state.measures[mIdx].heads.length) selected.h = state.measures[mIdx].heads.length - 1;
+    renderMeasures(); updateExport(); save();
+  }
+
   function currentDefaultSig() { return parseSig(document.getElementById('defaultSig').value); }
 
   function measureUnits(measure) { return measure.heads.reduce(function(sum, h) { return sum + h.duration; }, 0); }
@@ -488,6 +514,19 @@
         renderMeasures(); updateExport(); save();
       }; }(mIdx));
       sigRow.appendChild(sigSel);
+      var copyBtn = document.createElement('button');
+      copyBtn.className = 'bar-btn copy' + (clipboardSrc === mIdx ? ' active' : '');
+      copyBtn.textContent = 'Copy';
+      copyBtn.title = 'Copy this bar';
+      copyBtn.addEventListener('click', function(m) { return function() { copyBar(m); }; }(mIdx));
+      sigRow.appendChild(copyBtn);
+      var pasteBtn = document.createElement('button');
+      pasteBtn.className = 'bar-btn';
+      pasteBtn.textContent = 'Paste';
+      pasteBtn.title = 'Replace this bar with the copied one';
+      pasteBtn.disabled = !barClipboard;
+      pasteBtn.addEventListener('click', function(m) { return function() { pasteBar(m); }; }(mIdx));
+      sigRow.appendChild(pasteBtn);
       mDiv.appendChild(sigRow);
 
       var durRow = document.createElement('div');
@@ -719,6 +758,7 @@
   document.getElementById('removeMeasure').addEventListener('click', function() {
     if (state.measures.length <= 1) return;
     state.measures.pop();
+    if (clipboardSrc >= state.measures.length) clipboardSrc = -1;
     if (selected && selected.m >= state.measures.length) { selected.m = state.measures.length - 1; selected.h = 0; }
     renderMeasures(); updateExport(); save();
   });
@@ -727,6 +767,7 @@
     var sig = currentDefaultSig();
     state.measures = [blankMeasure(sig), blankMeasure(sig), blankMeasure(sig), blankMeasure(sig)];
     selected = null;
+    clipboardSrc = -1;
     renderMeasures(); updateExport(); save();
   });
 
