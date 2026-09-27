@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fret Sheet — Tab Writer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #E9DFC4; --paper-edge: #DED2AE; --ink: #211D14; --ink-soft: #55503F;
+    --wood: #4A3222; --wood-dark: #382518; --brass: #A97C33; --brass-bright: #C79A4E; --line: #9C9376;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #23201A; --paper-edge: #2C2820; --ink: #EFE7D3; --ink-soft: #B5AA8C;
+      --wood: #1B140D; --wood-dark: #120D08; --brass: #C79A4E; --brass-bright: #E0B96A; --line: #6B6350;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #23201A; --paper-edge: #2C2820; --ink: #EFE7D3; --ink-soft: #B5AA8C;
+    --wood: #1B140D; --wood-dark: #120D08; --brass: #C79A4E; --brass-bright: #E0B96A; --line: #6B6350;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--wood-dark);
+    background-image: linear-gradient(180deg, var(--wood) 0%, var(--wood-dark) 340px);
+    color: var(--ink); font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); min-height: 100%;
+  }
+
+  header { padding: 28px 20px 20px; padding-top: calc(28px + env(safe-area-inset-top, 0px)); max-width: 960px; margin: 0 auto; }
+  h1 {
+    font-family: 'Abril Fatface', Georgia, serif; font-weight: 400; font-size: clamp(2rem, 6vw, 3.1rem);
+    text-transform: uppercase; color: var(--brass-bright); margin: 0 0 6px; letter-spacing: 0.02em;
+    text-shadow: 3px 3px 0 rgba(0,0,0,0.28); outline: none;
+  }
+  h1:focus { text-shadow: 3px 3px 0 rgba(0,0,0,0.28), 0 0 0 1px var(--brass); }
+  .byline {
+    color: #C9BFA3; font-style: italic; font-size: 0.82rem; letter-spacing: 0.03em;
+    margin: 0 0 18px; border-top: 1px solid #6b5136; border-bottom: 1px solid #6b5136; padding: 6px 0; display: inline-block;
+  }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  select, button {
+    font-family: inherit; font-size: 0.82rem; border-radius: 3px; border: 1px solid #6b5136;
+    background: #3A2A1B; color: #E7DCC2; padding: 7px 12px; cursor: pointer;
+  }
+  select:hover, button:hover:not(:disabled) { border-color: var(--brass-bright); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button.primary { background: var(--brass); border-color: var(--brass); color: #251A0C; font-weight: 600; }
+  button.primary:hover { background: var(--brass-bright); }
+  button.danger { color: #E4B7A6; }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  main { max-width: 960px; margin: 0 auto; padding: 0 20px 60px; }
+
+  .sheet {
+    background: var(--paper); border: 1px solid var(--paper-edge); border-radius: 2px;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.35); padding: 22px 18px; overflow-x: auto;
+  }
+  .card-label { font-size: 0.7rem; letter-spacing: 0.12em; color: var(--ink-soft); margin: 0 0 10px; }
+  .hint { font-size: 0.72rem; color: var(--ink-soft); margin: 10px 2px 0; }
+
+  .staff-scroll { display: inline-block; min-width: 100%; }
+  .measures { display: flex; }
+  .measure { display: flex; flex-direction: column; border-right: 2px solid var(--ink); }
+  .measure:last-child { border-right: 3px double var(--ink); }
+
+  .string-row { display: flex; align-items: center; height: 32px; }
+  .string-label { width: 20px; flex: 0 0 20px; font-size: 0.76rem; color: var(--ink-soft); text-align: right; padding-right: 6px; }
+  .cell {
+    flex: 0 0 auto; height: 26px; border: none; background: transparent;
+    border-bottom: 1px solid var(--line); border-right: 1px dotted rgba(0,0,0,0.12);
+    color: var(--ink); font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 0.8rem;
+    text-align: center; padding: 0; margin: 0; overflow: hidden;
+  }
+  .cell.rest { color: var(--line); font-weight: 400; }
+  .cell.selected { background: rgba(169,124,51,0.22); border-bottom: 2px solid var(--brass); box-shadow: inset 0 -1px 0 var(--brass); }
+  .dur-cell {
+    flex: 0 0 auto; height: 26px; border: none; background: transparent; color: var(--brass);
+    font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.72rem;
+    border-right: 1px dotted rgba(0,0,0,0.12); padding: 0; margin: 0; overflow: hidden;
+  }
+  .dur-cell.selected { background: rgba(169,124,51,0.22); box-shadow: inset 0 0 0 1px var(--brass); }
+
+  .sig-row { display: flex; align-items: center; padding: 2px 0 4px; }
+  .sig-select {
+    font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.72rem;
+    border: none; border-bottom: 1px dashed var(--brass); background: transparent; color: var(--brass);
+    padding: 0 2px 2px; cursor: pointer; border-radius: 0;
+  }
+  .sig-select:hover { color: var(--brass-bright); border-color: var(--brass-bright); }
+
+  .keypad { margin-top: 18px; background: var(--paper); border: 1px solid var(--paper-edge); border-radius: 2px; padding: 16px 18px; box-shadow: 0 18px 40px rgba(0,0,0,0.35); }
+  .frets-row { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 8px; }
+  .fret-key {
+    flex: 0 0 auto; min-width: 30px; height: 34px; border-radius: 3px; border: 1px solid var(--paper-edge);
+    background: #DED0AC; color: var(--ink); font-weight: 700; font-size: 0.85rem;
+  }
+  .fret-key:hover { border-color: var(--brass); }
+  .fret-key.open { background: var(--wood); color: #E7DCC2; }
+
+  .keys-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tech-key {
+    min-width: 38px; height: 32px; border-radius: 3px; border: 1px solid var(--paper-edge);
+    background: #DED0AC; color: var(--ink); font-weight: 700; font-size: 0.8rem;
+  }
+  .tech-key.wide { min-width: 64px; font-size: 0.72rem; font-weight: 600; }
+  .tech-key.rest-key { color: var(--ink-soft); }
+  .tech-key.back-key { color: #8A3B2C; }
+
+  .dur-key {
+    min-width: 48px; height: 32px; border-radius: 3px; border: 1px solid var(--brass);
+    background: transparent; color: var(--brass); font-weight: 700; font-size: 0.76rem;
+  }
+  .dur-key.active { background: var(--brass); color: #251A0C; }
+  .dur-key:hover { border-color: var(--brass-bright); }
+
+  .bpm-control { display: flex; align-items: center; gap: 4px; }
+  .bpm-control button { padding: 7px 10px; }
+  .bpm-control input {
+    width: 54px; text-align: center; font-family: inherit; font-size: 0.82rem;
+    border-radius: 3px; border: 1px solid #6b5136; background: #3A2A1B; color: #E7DCC2; padding: 7px 4px;
+  }
+  .bpm-control span { font-size: 0.75rem; color: #C9BFA3; }
+
+  .nav-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 8px; flex-wrap: wrap; }
+  .nav-btns { display: flex; gap: 6px; }
+
+  .export-block { margin-top: 22px; }
+  .export-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+  .export-head span { color: #C9BFA3; font-size: 0.8rem; }
+  pre#exportText { background: var(--paper); border: 1px solid var(--paper-edge); color: var(--ink); padding: 16px; border-radius: 2px; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; margin: 0; }
+  .copied-msg { color: var(--brass-bright); font-size: 0.8rem; margin-left: 8px; opacity: 0; transition: opacity 0.2s; }
+  .copied-msg.show { opacity: 1; }
+
+  footer { text-align: center; color: #8B8066; font-size: 0.75rem; padding: 10px 20px 30px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="title" contenteditable="true" spellcheck="false">Untitled Tab</h1>
+  <p class="byline">Tap a string, then tap a fret. Just like the real fretboard.</p>
+  <div class="toolbar">
+    <select id="tuning">
+      <option value="e,B,G,D,A,E">Standard (EADGBE)</option>
+      <option value="e,B,G,D,A,D">Drop D</option>
+      <option value="d,A,F,C,G,C">Half-step down</option>
+      <option value="d,B,G,D,G,D">Open G</option>
+    </select>
+    <select id="defaultSig">
+      <option value="4/4">4/4</option>
+      <option value="3/4">3/4</option>
+      <option value="2/4">2/4</option>
+      <option value="6/8">6/8</option>
+      <option value="9/8">9/8</option>
+      <option value="12/8">12/8</option>
+      <option value="5/4">5/4</option>
+      <option value="7/8">7/8</option>
+    </select>
+    <button id="addMeasure" class="primary">+ Bar</button>
+    <button id="removeMeasure">− Bar</button>
+    <button id="clearAll" class="danger">Clear all</button>
+    <div class="bpm-control">
+      <button id="bpmDown">−</button>
+      <input id="bpmInput" type="number" min="20" max="300" value="120">
+      <span>BPM</span>
+      <button id="bpmUp">+</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="sheet">
+    <div class="staff-scroll"><div class="measures" id="measures"></div></div>
+    <p class="hint">Each bar has its own time signature — tap it above the bar to change. Stretching a note eats into the beats after it; shrinking gives that time back as a rest.</p>
+  </div>
+
+  <div class="keypad">
+    <p class="card-label">FRETBOARD KEYS — tap a cell above, then a fret</p>
+    <div class="frets-row" id="fretsRow"></div>
+    <div class="keys-row" id="techRow">
+      <button class="tech-key wide" data-tech="h">h · hammer</button>
+      <button class="tech-key wide" data-tech="p">p · pull-off</button>
+      <button class="tech-key wide" data-tech="b">b · bend</button>
+      <button class="tech-key" data-tech="/">/</button>
+      <button class="tech-key" data-tech="\">\</button>
+      <button class="tech-key" data-tech="~">~</button>
+      <button class="tech-key wide" data-tech="x">x · mute</button>
+      <button class="tech-key wide" data-tech="PM" title="Palm mute">PM · palm mute</button>
+      <button class="tech-key wide" data-tech="PH" title="Pinch harmonic">PH · pinch harm.</button>
+      <button class="tech-key" data-tech="↓" title="Whammy bar dip">↓ bar</button>
+      <button class="tech-key" data-tech="↑" title="Whammy bar release">↑ bar</button>
+      <button class="tech-key rest-key" id="restKey">– rest</button>
+      <button class="tech-key back-key" id="backKey">⌫</button>
+    </div>
+    <p class="card-label" style="margin-top:12px;">NOTE LENGTH — resizes the selected beat, bar stays 4/4</p>
+    <div class="keys-row" id="durRow">
+      <button class="dur-key" data-dur="w">Whole</button>
+      <button class="dur-key" data-dur="h">Half</button>
+      <button class="dur-key" data-dur="q">Quarter</button>
+      <button class="dur-key" data-dur="e">Eighth</button>
+      <button class="dur-key" data-dur="s">16th</button>
+    </div>
+    <div class="nav-row">
+      <div class="nav-btns">
+        <button id="prevCell">◀ prev</button>
+        <button id="nextCell">next ▶</button>
+      </div>
+      <label style="font-size:0.78rem; color:var(--ink-soft); display:flex; align-items:center; gap:6px;">
+        <input type="checkbox" id="autoAdvance" checked style="cursor:pointer;">
+        auto-advance
+      </label>
+    </div>
+  </div>
+
+  <div class="export-block">
+    <div class="export-head">
+      <span>Plain-text tab</span>
+      <div><button id="copyBtn">Copy</button><span class="copied-msg" id="copiedMsg">Copied</span></div>
+    </div>
+    <pre id="exportText"></pre>
+  </div>
+</main>
+
+<footer>Saved automatically in this browser.</footer>
+
+<script>
+(function() {
+  var BAR_UNITS = 16; // sixteenth-note resolution per quarter-based beat
+  var DUR_UNITS = { w: 16, h: 8, q: 4, e: 2, s: 1 };
+  var DUR_LABEL = { w: 'w', h: 'h', q: 'q', e: 'e', s: '16' };
+  var UNIT_PX = 13;
+  var MAX_FRET = 24;
+  var STORE_KEY = 'fret-sheet-v4';
+  var state = { title: 'Untitled Tab', tuning: 'e,B,G,D,A,E', bpm: 120, measures: [] };
+  var selected = null; // {m, h, s}
+
+  function sigCapacity(sig) { return sig.num * (16 / sig.den); }
+  function parseSig(str) { var p = str.split('/'); return { num: parseInt(p[0], 10), den: parseInt(p[1], 10) }; }
+  function sigStr(sig) { return sig.num + '/' + sig.den; }
+
+  function newHead(units) { return { duration: units, grid: ['-', '-', '-', '-', '-', '-'] }; }
+  function blankMeasure(sig) {
+    sig = sig || { num: 4, den: 4 };
+    var beat = 16 / sig.den;
+    var heads = [];
+    for (var i = 0; i < sig.num; i++) heads.push(newHead(beat));
+    return { sig: sig, heads: heads };
+  }
+  function applySig(measure, sig) {
+    var newCap = sigCapacity(sig);
+    var total = 0, newHeads = [];
+    for (var i = 0; i < measure.heads.length; i++) {
+      var h = measure.heads[i];
+      if (total + h.duration <= newCap) { newHeads.push(h); total += h.duration; }
+      else { var rem = newCap - total; if (rem > 0) { newHeads.push({ duration: rem, grid: h.grid.slice() }); total = newCap; } break; }
+    }
+    if (total < newCap) newHeads.push(newHead(newCap - total));
+    measure.sig = sig;
+    measure.heads = newHeads;
+  }
+  function currentDefaultSig() { return parseSig(document.getElementById('defaultSig').value); }
+
+  function measureUnits(measure) { return measure.heads.reduce(function(sum, h) { return sum + h.duration; }, 0); }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.measures) && parsed.measures.length &&
+            parsed.measures[0] && Array.isArray(parsed.measures[0].heads)) {
+          state = parsed;
+          if (!state.bpm) state.bpm = 120;
+          state.measures.forEach(function(m) { if (!m.sig) m.sig = { num: 4, den: 4 }; });
+          return;
+        }
+      }
+    } catch (e) { console.warn('load failed', e); }
+    state.measures = [blankMeasure(), blankMeasure(), blankMeasure(), blankMeasure()];
+  }
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { console.warn('save failed', e); } }
+
+  var measuresEl = document.getElementById('measures');
+  var titleEl = document.getElementById('title');
+  var tuningEl = document.getElementById('tuning');
+  var exportEl = document.getElementById('exportText');
+  var fretsRow = document.getElementById('fretsRow');
+
+  function buildFretsRow() {
+    fretsRow.innerHTML = '';
+    for (var f = 0; f <= MAX_FRET; f++) {
+      var b = document.createElement('button');
+      b.className = 'fret-key' + (f === 0 ? ' open' : '');
+      b.textContent = f;
+      b.addEventListener('click', function(n) { return function() { pressNumber(n); }; }(f));
+      fretsRow.appendChild(b);
+    }
+  }
+
+  function renderMeasures() {
+    measuresEl.innerHTML = '';
+    var labels = state.tuning.split(',');
+    state.measures.forEach(function(measure, mIdx) {
+      var mDiv = document.createElement('div');
+      mDiv.className = 'measure';
+
+      var sigRow = document.createElement('div');
+      sigRow.className = 'sig-row';
+      var sigSel = document.createElement('select');
+      sigSel.className = 'sig-select';
+      ['4/4', '3/4', '2/4', '6/8', '9/8', '12/8', '5/4', '7/8'].forEach(function(opt) {
+        var o = document.createElement('option'); o.value = opt; o.textContent = opt; sigSel.appendChild(o);
+      });
+      sigSel.value = sigStr(measure.sig);
+      sigSel.addEventListener('change', function(m) { return function(e) {
+        applySig(state.measures[m], parseSig(e.target.value));
+        if (selected && selected.m === m && selected.h >= state.measures[m].heads.length) selected.h = state.measures[m].heads.length - 1;
+        renderMeasures(); updateExport(); save();
+      }; }(mIdx));
+      sigRow.appendChild(sigSel);
+      mDiv.appendChild(sigRow);
+
+      var durRow = document.createElement('div');
+      durRow.className = 'string-row';
+      var durLabel = document.createElement('span');
+      durLabel.className = 'string-label';
+      durRow.appendChild(durLabel);
+      measure.heads.forEach(function(head, hIdx) {
+        var durCell = document.createElement('button');
+        durCell.className = 'dur-cell';
+        durCell.style.width = (head.duration * UNIT_PX) + 'px';
+        if (selected && selected.m === mIdx && selected.h === hIdx) durCell.className += ' selected';
+        durCell.textContent = DUR_LABEL[unitsToCode(head.duration)];
+        durCell.addEventListener('click', function(m, h2) { return function() { selected = { m: m, h: h2, s: (selected ? selected.s : 0) }; renderMeasures(); }; }(mIdx, hIdx));
+        durRow.appendChild(durCell);
+      });
+      mDiv.appendChild(durRow);
+
+      for (var s = 0; s < 6; s++) {
+        var row = document.createElement('div');
+        row.className = 'string-row';
+        var label = document.createElement('span');
+        label.className = 'string-label';
+        label.textContent = labels[s] || '?';
+        row.appendChild(label);
+        measure.heads.forEach(function(head, hIdx) {
+          var val = head.grid[s];
+          var cell = document.createElement('button');
+          cell.className = 'cell' + (val === '-' ? ' rest' : '');
+          cell.style.width = (head.duration * UNIT_PX) + 'px';
+          if (selected && selected.m === mIdx && selected.h === hIdx && selected.s === s) cell.className += ' selected';
+          cell.textContent = val;
+          cell.addEventListener('click', function(m, s2, h2) { return function() { selected = { m: m, h: h2, s: s2 }; renderMeasures(); }; }(mIdx, s, hIdx));
+          row.appendChild(cell);
+        });
+        mDiv.appendChild(row);
+      }
+      measuresEl.appendChild(mDiv);
+    });
+    document.getElementById('removeMeasure').disabled = state.measures.length <= 1;
+    highlightDur();
+  }
+
+  function unitsToCode(units) {
+    if (units >= 16) return 'w';
+    if (units >= 8) return 'h';
+    if (units >= 4) return 'q';
+    if (units >= 2) return 'e';
+    return 's';
+  }
+
+  function updateExport() {
+    var labels = state.tuning.split(',');
+    var lines = labels.map(function() { return ''; });
+    state.measures.forEach(function(measure) {
+      measure.heads.forEach(function(head) {
+        var width = head.duration;
+        for (var s = 0; s < 6; s++) width = Math.max(width, head.grid[s].length);
+        for (s = 0; s < 6; s++) {
+          var v = head.grid[s];
+          while (v.length < width) v += '-';
+          lines[s] += v;
+        }
+      });
+      for (var s2 = 0; s2 < 6; s2++) lines[s2] += '|';
+    });
+    var sigList = state.measures.map(function(m) { return sigStr(m.sig); }).join(' ');
+    var out = 'Tempo: ' + state.bpm + ' BPM — bars: ' + sigList + '\n' + labels.map(function(l, i) { return l + '|' + lines[i]; }).join('\n');
+    exportEl.textContent = out;
+  }
+
+  function renderAll() {
+    titleEl.textContent = state.title;
+    tuningEl.value = state.tuning;
+    document.getElementById('bpmInput').value = state.bpm;
+    renderMeasures();
+    updateExport();
+  }
+
+  function ensureSelection() { if (!selected) selected = { m: 0, h: 0, s: 0 }; }
+  function currentHead() { return state.measures[selected.m].heads[selected.h]; }
+
+  // Resize the selected head, absorbing/releasing time from the heads that follow it
+  // so the measure always stays exactly one 4/4 bar (16 sixteenth-note units).
+  function resizeHead(mIdx, hIdx, newUnits) {
+    var heads = state.measures[mIdx].heads;
+    var head = heads[hIdx];
+    var diff = newUnits - head.duration;
+    if (diff === 0) return;
+    if (diff < 0) {
+      head.duration += diff; // shrink
+      heads.splice(hIdx + 1, 0, newHead(-diff)); // freed time becomes a new rest beat
+      return;
+    }
+    var remaining = diff;
+    var i = hIdx + 1;
+    while (remaining > 0 && i < heads.length) {
+      var next = heads[i];
+      if (next.duration <= remaining) { remaining -= next.duration; heads.splice(i, 1); }
+      else { next.duration -= remaining; remaining = 0; }
+    }
+    head.duration = newUnits - remaining; // clamps at the end of the bar
+  }
+
+  function advance() {
+    if (!document.getElementById('autoAdvance').checked) return;
+    var heads = state.measures[selected.m].heads;
+    selected.h++;
+    if (selected.h >= heads.length) {
+      selected.h = 0;
+      selected.m++;
+      if (selected.m >= state.measures.length) state.measures.push(blankMeasure(state.measures[state.measures.length - 1].sig));
+    }
+  }
+
+  function pressNumber(n) {
+    ensureSelection();
+    currentHead().grid[selected.s] = String(n);
+    advance();
+    renderMeasures(); updateExport(); save();
+  }
+  function pressTechnique(ch) {
+    ensureSelection();
+    var head = currentHead();
+    var cur = head.grid[selected.s];
+    head.grid[selected.s] = cur === '-' ? ch : cur + ch;
+    renderMeasures(); updateExport(); save();
+  }
+  function pressRest() {
+    ensureSelection();
+    currentHead().grid[selected.s] = '-';
+    advance();
+    renderMeasures(); updateExport(); save();
+  }
+  function pressBack() {
+    ensureSelection();
+    var head = currentHead();
+    var cur = head.grid[selected.s];
+    head.grid[selected.s] = cur.length > 1 ? cur.slice(0, -1) : '-';
+    renderMeasures(); updateExport(); save();
+  }
+  function pressDuration(code) {
+    ensureSelection();
+    resizeHead(selected.m, selected.h, DUR_UNITS[code]);
+    renderMeasures(); updateExport(); save();
+  }
+  function highlightDur() {
+    var code = selected ? unitsToCode(currentHead().duration) : 'q';
+    document.querySelectorAll('#durRow .dur-key').forEach(function(b) {
+      b.classList.toggle('active', b.getAttribute('data-dur') === code);
+    });
+  }
+  function moveSelection(dir) {
+    ensureSelection();
+    var heads = state.measures[selected.m].heads;
+    var h = selected.h + dir;
+    if (h < 0) {
+      if (selected.m > 0) { selected.m--; selected.h = state.measures[selected.m].heads.length - 1; }
+    } else if (h >= heads.length) {
+      if (selected.m < state.measures.length - 1) { selected.m++; selected.h = 0; }
+    } else { selected.h = h; }
+    renderMeasures();
+  }
+
+  titleEl.addEventListener('input', function() { state.title = titleEl.textContent.trim() || 'Untitled Tab'; save(); });
+  tuningEl.addEventListener('change', function() { state.tuning = tuningEl.value; renderMeasures(); updateExport(); save(); });
+
+  document.getElementById('addMeasure').addEventListener('click', function() { state.measures.push(blankMeasure(currentDefaultSig())); renderMeasures(); updateExport(); save(); });
+  document.getElementById('removeMeasure').addEventListener('click', function() {
+    if (state.measures.length <= 1) return;
+    state.measures.pop();
+    if (selected && selected.m >= state.measures.length) { selected.m = state.measures.length - 1; selected.h = 0; }
+    renderMeasures(); updateExport(); save();
+  });
+  document.getElementById('clearAll').addEventListener('click', function() {
+    if (!confirm('Clear the whole tab?')) return;
+    var sig = currentDefaultSig();
+    state.measures = [blankMeasure(sig), blankMeasure(sig), blankMeasure(sig), blankMeasure(sig)];
+    selected = null;
+    renderMeasures(); updateExport(); save();
+  });
+
+  document.getElementById('techRow').addEventListener('click', function(e) {
+    var t = e.target.closest('[data-tech]');
+    if (t) pressTechnique(t.getAttribute('data-tech'));
+  });
+  document.getElementById('durRow').addEventListener('click', function(e) {
+    var t = e.target.closest('[data-dur]');
+    if (t) pressDuration(t.getAttribute('data-dur'));
+  });
+
+  var bpmInput = document.getElementById('bpmInput');
+  function clampBpm(v) { v = parseInt(v, 10); if (isNaN(v)) v = 120; return Math.max(20, Math.min(300, v)); }
+  function setBpm(v) { state.bpm = clampBpm(v); bpmInput.value = state.bpm; updateExport(); save(); }
+  bpmInput.addEventListener('change', function() { setBpm(bpmInput.value); });
+  document.getElementById('bpmUp').addEventListener('click', function() { setBpm(state.bpm + 5); });
+  document.getElementById('bpmDown').addEventListener('click', function() { setBpm(state.bpm - 5); });
+
+  document.getElementById('restKey').addEventListener('click', pressRest);
+  document.getElementById('backKey').addEventListener('click', pressBack);
+  document.getElementById('prevCell').addEventListener('click', function() { moveSelection(-1); });
+  document.getElementById('nextCell').addEventListener('click', function() { moveSelection(1); });
+
+  document.getElementById('copyBtn').addEventListener('click', function() {
+    var text = exportEl.textContent;
+    var msg = document.getElementById('copiedMsg');
+    function flash() { msg.classList.add('show'); setTimeout(function() { msg.classList.remove('show'); }, 1200); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(flash).catch(function() { fallbackCopy(text); flash(); });
+    } else { fallbackCopy(text); flash(); }
+  });
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  buildFretsRow();
+  load();
+  renderAll();
+})();
+</script>
+</body>
+</html>
